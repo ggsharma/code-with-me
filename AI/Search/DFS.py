@@ -67,7 +67,7 @@ class DFS:
 
         path.append(curr_node.uuid)
 
-        for child in curr_node.children: # 1,2,3
+        for child in curr_node.children: # 2,3
             target_found = target_found[0] or self.find_target(child, target_node, path, depth + 1)
             if target_found[0]:
                 return target_found
