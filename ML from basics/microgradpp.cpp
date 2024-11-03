@@ -70,6 +70,41 @@ public:
         };
         return out;
     }
+
+    // out = base^exponent
+    // dL/d(base) = dL/d(out) *    d(out)/d(base)
+    //            = out->grad *    exponent * base^(exponent-1)
+
+    static ValuePtr pow(const ValuePtr& base, float exponent) {
+        float newValue = std::pow(base->data, exponent);
+        auto out = Value::create(newValue, "^");
+        out->prev = {base};
+        out->backward = [base_weak = std::weak_ptr<Value>(base), out_weak = std::weak_ptr<Value>(out), exponent](){
+            if (auto base = base_weak.lock()) {
+                base->grad += exponent * std::pow(base->data, exponent - 1) * out_weak.lock()->grad;
+            }
+        };
+        return out;
+    }
+    // c = a/b
+    // c = a*b^-1
+    static ValuePtr divide(const ValuePtr& lhs, const ValuePtr& rhs) {
+        auto reciprocal = pow(rhs, -1);
+        return multiply(lhs, reciprocal);
+    }
+
+    static ValuePtr relu(const ValuePtr& input) {
+        float val = std::max(0.0f, input->data);
+        auto out = Value::create(val, "ReLU");
+        out->prev = {input};
+        out->backward = [input, out]() {
+            // 0 * out_grad
+            // local_grad * out_grad
+            if (input) input->grad += (out->data > 0) * out->grad;
+        };
+        return out;
+    }
+
     
     void buildTopo(std::shared_ptr<Value> v, std::unordered_set<std::shared_ptr<Value>, Hash>& visited, std::vector<std::shared_ptr<Value>>& topo){
          if(visited.find(v) == visited.end()){
@@ -107,6 +142,9 @@ public:
 size_t Hash::operator()(const ValuePtr value) const {
     return std::hash<std::string>()(value.get()->op) ^ std::hash<float>()(value.get()->data);
 }
+
+
+
 
 int main()
 {
